@@ -1,6 +1,12 @@
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::{
+    collections::{HashMap, HashSet, LinkedList},
+    fs::File,
+    io::Write,
+};
+
+use crate::config::get_config;
 
 #[derive(Deserialize, Serialize)]
 enum InerWrapValue {
@@ -17,7 +23,11 @@ pub struct CoreData {
 }
 
 impl CoreData {
-    pub fn dump(&self) {}
+    pub fn dump(&self) {
+        let dump_str = serde_json::to_string(self).unwrap();
+        let mut dump_file = File::open(get_config().rdb_path.as_str()).unwrap();
+        dump_file.write_all(dump_str.as_bytes()).unwrap();
+    }
     pub fn load() -> Self {
         Self {
             data: HashMap::new(),
