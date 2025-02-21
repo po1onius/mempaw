@@ -2,8 +2,8 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet, LinkedList},
-    default,
     fs::File,
+    hash::Hash,
     io::Write,
 };
 
@@ -19,20 +19,41 @@ enum InnerWrapValue {
 }
 
 #[derive(Deserialize, Serialize, Default)]
-struct KeyMeta {
+struct CoreKey {
+    key: String,
     time_stamp: u32,
     access_times: u32,
 }
 
 #[derive(Deserialize, Serialize)]
-struct CoreVaule {
-    meta: KeyMeta,
-    value: InnerWrapValue,
+pub struct CoreData {
+    data: HashMap<CoreKey, InnerWrapValue>,
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct CoreData {
-    data: HashMap<String, CoreVaule>,
+pub fn test() {}
+
+impl PartialEq for CoreKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for CoreKey {}
+
+impl Hash for CoreKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
+}
+
+impl From<&str> for CoreKey {
+    fn from(value: &str) -> Self {
+        CoreKey {
+            key: value.to_string(),
+            time_stamp: 0,
+            access_times: 0,
+        }
+    }
 }
 
 impl CoreData {
@@ -48,21 +69,22 @@ impl CoreData {
     }
 
     pub fn del(&mut self, k: &str) {
-        self.data.remove(k);
+        self.data.remove(&CoreKey::from(k));
     }
 
     pub fn set(&mut self, k: &str, v: &str) {
         let r = self.data.insert(
-            k.to_string(),
-            CoreVaule {
-                value: InnerWrapValue::Str(v.to_string()),
-                meta: KeyMeta::default(),
+            CoreKey {
+                key: k.to_string(),
+                time_stamp: 0,
+                access_times: 0,
             },
+            InnerWrapValue::Str(v.to_string()),
         );
     }
 
-    pub fn get(&mut self, k: &str, v: &str) -> String {
-        if let Some(inner) = self.data.get_mut(k) {
+    pub fn get(&mut self, k: &str, v: &str) -> Result<String, ()> {
+        if let Some(inner) = self.data.get_mut(&CoreKey::from(k)) {
             if let CoreVaule {
                 meta:
                     KeyMeta {
@@ -73,9 +95,29 @@ impl CoreData {
             } = inner
             {
                 *access_times += 1;
-                return s.to_string();
+                return Ok(s.to_string());
             }
         }
-        "".into()
+        Err(())
+    }
+
+    pub fn hdel(&mut self, k: &str, kk: &str) -> Result<(), ()> {
+        if let Some(inner) = self.data.get_mut(k) {
+            if let CoreVaule {
+                meta:
+                    KeyMeta {
+                        time_stamp: _,
+                        access_times,
+                    },
+                value: InnerWrapValue::Hash(hm),
+            } = inner
+            {
+                *access_times += 1;
+                if hm.remove(kk).is_some() {
+                    return Ok(());
+                }
+            }
+        }
+        return Err(());
     }
 }
