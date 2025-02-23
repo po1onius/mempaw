@@ -1,15 +1,16 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use ordered_float::OrderedFloat;
-use serde::{Deserialize, Serialize};
 use std::{
+    cell::Cell,
     collections::{HashMap, HashSet, LinkedList},
-    fs::File,
+    fs::{File, OpenOptions},
     hash::Hash,
-    io::Write,
+    io::{Read, Write},
 };
 
 use crate::config::get_config;
 
-#[derive(Deserialize, Serialize)]
+#[derive(BorshDeserialize, BorshSerialize)]
 enum InnerWrapValue {
     Str(String),
     Set(HashSet<String>),
@@ -18,14 +19,14 @@ enum InnerWrapValue {
     Zset(HashMap<OrderedFloat<f32>, String>),
 }
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(BorshDeserialize, BorshSerialize, Default, PartialOrd, Ord, Eq)]
 struct CoreKey {
     key: String,
-    time_stamp: u32,
-    access_times: u32,
+    time_stamp: Cell<u32>,
+    access_times: Cell<u32>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct CoreData {
     data: HashMap<CoreKey, InnerWrapValue>,
 }
@@ -38,8 +39,6 @@ impl PartialEq for CoreKey {
     }
 }
 
-impl Eq for CoreKey {}
-
 impl Hash for CoreKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.key.hash(state);
@@ -50,22 +49,27 @@ impl From<&str> for CoreKey {
     fn from(value: &str) -> Self {
         CoreKey {
             key: value.to_string(),
-            time_stamp: 0,
-            access_times: 0,
+            time_stamp: Cell::new(0),
+            access_times: Cell::new(0),
         }
     }
 }
 
 impl CoreData {
     pub fn dump(&self) {
-        let dump_str = serde_json::to_string(self).unwrap();
-        let mut dump_file = File::open(get_config().rdb_path.as_str()).unwrap();
-        dump_file.write_all(dump_str.as_bytes()).unwrap();
+        let mut file = OpenOptions::new()
+            .write(true)
+            .open(&get_config().rdb_path)
+            .unwrap();
+        let bin = borsh::to_vec(&self).unwrap();
+        let _ = file.write_all(&bin).unwrap();
     }
+
     pub fn load() -> Self {
-        Self {
-            data: HashMap::new(),
-        }
+        let mut file = File::open(&get_config().rdb_path).unwrap();
+        let mut bin_buf = Vec::new();
+        let _ = file.read_to_end(&mut bin_buf).unwrap();
+        borsh::from_slice(&bin_buf).unwrap()
     }
 
     pub fn del(&mut self, k: &str) {
@@ -76,8 +80,8 @@ impl CoreData {
         let r = self.data.insert(
             CoreKey {
                 key: k.to_string(),
-                time_stamp: 0,
-                access_times: 0,
+                time_stamp: Cell::new(0),
+                access_times: Cell::new(0),
             },
             InnerWrapValue::Str(v.to_string()),
         );
