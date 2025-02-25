@@ -30,7 +30,7 @@ struct CoreValue {
     value: InnerWrapValue,
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Default)]
 pub struct CoreData {
     data: HashMap<String, CoreValue>,
 }
@@ -65,23 +65,16 @@ impl CoreData {
     }
 
     pub fn set(&mut self, k: &str, v: &str) {
-        match self.data.get_mut(k) {
-            Some(inner) => match &mut inner.value {
-                InnerWrapValue::Str(s) => {
-                    *s = v.to_string();
-                }
-                _ => (),
-            },
-            None => {
-                self.data.insert(
-                    k.to_string(),
-                    CoreValue {
-                        meta: CoreKeyMeta::default(),
-                        value: InnerWrapValue::Str(v.to_string()),
-                    },
-                );
-            }
+        if self.data.get(k).is_some() {
+            self.data.remove(k).unwrap();
         }
+        self.data.insert(
+            k.to_string(),
+            CoreValue {
+                meta: CoreKeyMeta::default(),
+                value: InnerWrapValue::Str(v.to_string()),
+            },
+        );
     }
 
     pub fn get(&self, k: &str) -> Result<&str, ()> {
@@ -112,5 +105,34 @@ impl CoreData {
             }
         }
         Err(())
+    }
+
+    pub fn hset(&mut self, k: &str, kk: &str, v: &str) {
+        match self.data.get_mut(k) {
+            Some(inner) => match &mut inner.value {
+                InnerWrapValue::Hash(m) => {
+                    if let Some(cur_val) = m.get_mut(kk) {
+                        *cur_val = v.to_string();
+                    } else {
+                        m.insert(kk.to_string(), v.to_string());
+                    }
+                }
+                _ => {
+                    let m = HashMap::from([(kk.to_string(), v.to_string())]);
+                    *inner = CoreValue {
+                        meta: CoreKeyMeta::default(),
+                        value: InnerWrapValue::Hash(m),
+                    };
+                }
+            },
+            None => {
+                let m = HashMap::from([(kk.to_string(), v.to_string())]);
+                let new_val = CoreValue {
+                    meta: CoreKeyMeta::default(),
+                    value: InnerWrapValue::Hash(m),
+                };
+                self.data.insert(k.to_string(), new_val);
+            }
+        }
     }
 }
