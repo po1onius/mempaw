@@ -4,12 +4,14 @@ use std::{fs, sync::OnceLock};
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub rdb_path: String,
+    pub port: u32,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             rdb_path: "config.toml".to_string(),
+            port: 7389,
         }
     }
 }
