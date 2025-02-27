@@ -1,7 +1,18 @@
-use std::{collections::HashMap, sync::mpsc::Sender};
-use tokio::net::{TcpListener, TcpStream};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU32, mpsc::Sender},
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 
 use crate::config::get_config;
+
+static ID: AtomicU32 = AtomicU32::new(0);
+fn get_id() -> u32 {
+    ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+}
 
 struct CmdMsg {
     cmd: String,
@@ -21,12 +32,13 @@ impl Connection {
 
         loop {
             let new_conn = listener.accept().await.unwrap();
-            self.conns.insert(1, new_conn.0);
+            let cmd_msg_tx_clone = self.cmd_msg_tx.clone();
+            self.conns.insert(get_id(), new_conn.0);
             if true {
                 break;
             }
 
-            tokio::spawn(async {});
+            tokio::spawn(async move { new_conn.0.read(buf) });
         }
     }
 }
