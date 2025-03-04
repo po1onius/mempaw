@@ -17,9 +17,9 @@ fn get_id() -> u32 {
     ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
 }
 
-struct OpMsg {
-    cmd: String,
-    conn_id: u32,
+pub struct OpMsg {
+    pub op: String,
+    pub conn_id: u32,
 }
 
 pub struct Connection {
@@ -56,7 +56,7 @@ impl Connection {
                 let mut buf = Vec::<u8>::new();
                 let _ = conn_r.read(buf.as_mut_slice()).await;
                 let _ = cmd_msg_tx_clone.send(OpMsg {
-                    cmd: String::from_utf8(buf).unwrap(),
+                    op: String::from_utf8(buf).unwrap(),
                     conn_id,
                 });
             });
@@ -64,14 +64,15 @@ impl Connection {
     }
 
     pub async fn response(&mut self, conn_id: u32, content: &str) {
-        self.connsr
+        let _ = self
+            .connsr
             .get_mut(&conn_id)
             .unwrap()
             .write(content.as_bytes())
             .await;
     }
 
-    pub fn fetch_cmd(&mut self) -> OpMsg {
+    pub fn fetch_op(&mut self) -> OpMsg {
         let op = self.cmd_msg_rx.recv().unwrap();
         op
     }
