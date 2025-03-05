@@ -5,6 +5,10 @@ use tokio::sync::Mutex;
 
 use crate::connection::Connection;
 use crate::memdata::CoreData;
+use crate::parse::{
+    Op::{GET, SET},
+    parse_str_set,
+};
 
 pub struct Server {
     data: CoreData,
@@ -25,9 +29,14 @@ impl Server {
 
         thread::spawn(move || {
             loop {
-                let op = conns_clone1.blocking_lock().fetch_op();
-                if op.op == "shutdown" {
-                    break;
+                let op = conns_clone1.blocking_lock().fetch_op().op;
+                match parse_str_set(&op) {
+                    Ok((_, opp)) => match opp {
+                        SET(k, v) => {
+                            self.data.set(&k, &v);
+                        }
+                    },
+                    _ => (),
                 }
             }
         });

@@ -1,6 +1,7 @@
 mod config;
 mod connection;
 mod memdata;
+mod parse;
 mod server;
 
 use server::Server;
