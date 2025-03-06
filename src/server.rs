@@ -31,11 +31,6 @@ impl Server {
             loop {
                 let op = conns_clone1.blocking_lock().fetch_op().op;
                 match parse_str_set(&op) {
-                    Ok((_, opp)) => match opp {
-                        SET(k, v) => {
-                            self.data.set(&k, &v);
-                        }
-                    },
                     _ => (),
                 }
             }
