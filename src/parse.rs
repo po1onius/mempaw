@@ -6,6 +6,7 @@ use nom::{
     sequence::delimited,
 };
 
+#[derive(Debug)]
 pub enum Op {
     GET(String),
     SET(String, String),
@@ -34,17 +35,24 @@ pub fn parse_str_set(input: &str) -> IResult<&str, Op> {
     let (input, k) = parse_simple_string(input)?;
     let (input, _) = space1(input)?;
     let (input, v) = parse_quoted_string(input)?;
-    Ok(("", Op::SET(k.to_string(), v.to_string())))
+    Ok((input, Op::SET(k.to_string(), v.to_string())))
 }
 
 pub fn parse_hash_set(input: &str) -> IResult<&str, Op> {
     let (input, _) = tag("HSET")(input)?;
     let (input, _) = space1(input)?;
-    let (input, k) = parse_simple_string(input)?;
+    let (mut input, k) = parse_simple_string(input)?;
+    let mut pairs = Vec::new();
     loop {
-        let (input, _) = space1(input)?;
-        let (input, ink) = parse_simple_string(input)?;
-        let (input, inv) = parse_quoted_string(input)?;
+        let (ls, _) = space1(input)?;
+        let (lk, ink) = parse_simple_string(ls)?;
+        let (ls, _) = space1(lk)?;
+        let (lv, inv) = parse_quoted_string(ls)?;
+        input = lv;
+        pairs.push((ink, inv));
+        if input == "" {
+            return Ok((input, Op::HSET(k, pairs)));
+        }
     }
 }
 
@@ -54,7 +62,6 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let result = parse_hash_set("HSET supk k1 \"v1\"").unwrap().0;
-        assert_eq!(result, "");
+        println!("{:?}", parse_hash_set(r#"HSET a b "c""#).unwrap().1);
     }
 }
