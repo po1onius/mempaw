@@ -2,7 +2,6 @@ use nom::{
     IResult, Parser,
     bytes::complete::{escaped, tag, take_till1},
     character::complete::{char, none_of, space1},
-    multi::many1,
     sequence::delimited,
 };
 
@@ -56,12 +55,32 @@ pub fn parse_hash_set(input: &str) -> IResult<&str, Op> {
     }
 }
 
+pub fn parse_str_get(input: &str) -> IResult<&str, Op> {
+    let (input, _) = tag("GET")(input)?;
+    let (input, _) = space1(input)?;
+    let (input, k) = parse_simple_string(input)?;
+    Ok((input, Op::GET(k)))
+}
+
+pub fn parse_hash_get(input: &str) -> IResult<&str, Op> {
+    let (input, _) = tag("HGET")(input)?;
+    let (input, _) = space1(input)?;
+    let (input, k) = parse_simple_string(input)?;
+    let (input, _) = space1(input)?;
+    let (input, ink) = parse_simple_string(input)?;
+    Ok((input, Op::HGET(k, ink)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn it_works() {
-        println!("{:?}", parse_hash_set(r#"HSET a b "c""#).unwrap().1);
+        let (void, r) = parse_hash_set(r#"HSET a b "c" d "e""#).unwrap();
+        assert_eq!("", void);
+        if let Op::HSET(k, v) = r {
+            assert_eq!(2, v.len());
+        }
     }
 }
