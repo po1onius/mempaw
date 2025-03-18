@@ -88,17 +88,52 @@ pub mod op {
 }
 
 pub mod frame {
+    use std::iter::zip;
+
+    use tokio::sync::mpsc::{Receiver, Sender, channel};
+
     use tokio::{io::AsyncReadExt, net::TcpStream};
+
+    use super::op::{Op, parse_str_get};
 
     pub struct Frame {
         pub op: String,
     }
 
-    pub async fn read_frame(stream: &mut TcpStream) -> Option<Frame> {
-        let mut buf = [0; 1024];
-        let _ = stream.read(&mut buf).await;
-        Some(Frame {
-            op: str::from_utf8(&buf).unwrap().to_string(),
-        })
+    pub struct OpCache {
+        stream: TcpStream,
+        _cache: Sender<Op>,
+        cache: Receiver<Op>,
+    }
+
+    impl OpCache {
+        fn new(stream: TcpStream) -> Self {
+            let (tx, rx) = channel(100);
+            Self {
+                stream,
+                _cache: tx,
+                cache: rx,
+            }
+        }
+
+        pub async fn run(&mut self) {
+            loop {
+                let mut buf = [0; 1024];
+                let size = self.stream.read(&mut buf).await.unwrap();
+                if size == 0 {
+                    break;
+                }
+                for (i, j) in zip(buf[..-1].iter().enumerate(), buf[1..].iter()) {
+                    if i.1 == '\r' && j == '\n' {
+                        let op = String::from_utf8(buf).unwrap();
+                        todo!();
+                    }
+                }
+            }
+        }
+
+        pub async fn fetch(&mut self) -> Op {
+            self.cache.recv().await.unwrap()
+        }
     }
 }

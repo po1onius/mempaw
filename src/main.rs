@@ -6,7 +6,8 @@ mod utils;
 
 use server::Server;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut server = Server::new();
-    server.run();
+    server.run().await;
 }
