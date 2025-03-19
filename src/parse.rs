@@ -94,7 +94,9 @@ pub mod frame {
 
     use tokio::{io::AsyncReadExt, net::TcpStream};
 
-    use super::op::{Op, parse_str_get};
+    use crate::parse::op::{parse_hash_get, parse_str_set};
+
+    use super::op::{Op, parse_hash_set, parse_str_get};
 
     pub struct Frame {
         pub op: String,
@@ -123,10 +125,12 @@ pub mod frame {
                 if size == 0 {
                     break;
                 }
-                for (i, j) in zip(buf[..-1].iter().enumerate(), buf[1..].iter()) {
-                    if i.1 == '\r' && j == '\n' {
-                        let op = String::from_utf8(buf).unwrap();
-                        todo!();
+                for (i, j) in zip(buf[..buf.len() - 1].iter().enumerate(), buf[1..].iter()) {
+                    if *i.1 == '\r' as u8 && *j == '\n' as u8 {
+                        let op = String::from_utf8_lossy(&buf).to_string();
+                        if let Some(op) = str2op(&op) {
+                            self._cache.send(op).await;
+                        }
                     }
                 }
             }
@@ -135,5 +139,29 @@ pub mod frame {
         pub async fn fetch(&mut self) -> Op {
             self.cache.recv().await.unwrap()
         }
+    }
+
+    fn str2op(s: &str) -> Option<Op> {
+        if let Ok((s, op)) = parse_hash_get(s) {
+            if s == "" {
+                return Some(op);
+            }
+        }
+        if let Ok((s, op)) = parse_hash_get(s) {
+            if s == "" {
+                return Some(op);
+            }
+        }
+        if let Ok((s, op)) = parse_str_get(s) {
+            if s == "" {
+                return Some(op);
+            }
+        }
+        if let Ok((s, op)) = parse_str_set(s) {
+            if s == "" {
+                return Some(op);
+            }
+        }
+        None
     }
 }
