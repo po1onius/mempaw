@@ -14,6 +14,41 @@ pub mod op {
         HGET(String, String),
     }
 
+    pub enum CliValue {
+        Str(String),
+        Int(i32),
+        Float(f32),
+        Bin(Vec<u8>),
+    }
+
+    // *k\r\n
+    const CLI_LEN_MIN: u32 = 4;
+
+    fn parse(buf: &[u8; 1024], len: usize) -> (Vec<CliValue>, usize) {
+        match buf[0] {
+            b'*' => {
+                let idx = buf[1..].iter().position(|v| *v == b'\r').unwrap();
+                let mut len_arry = str::from_utf8(&buf[1..idx])
+                    .unwrap()
+                    .parse::<u32>()
+                    .unwrap();
+                loop {
+                    if len_arry == 0 {
+                        break;
+                    }
+
+                    len_arry -= 1;
+                }
+            }
+            b'+' => {}
+            _ => {
+                panic!("parse cli");
+            }
+        }
+
+        (Vec::new(), 0)
+    }
+
     fn parse_simple_string(input: &str) -> IResult<&str, String> {
         let (input, s) = take_till1(|s| s == ' ')(input)?;
         Ok((input, s.to_string()))
@@ -121,6 +156,7 @@ pub mod frame {
         pub async fn run(&mut self) {
             loop {
                 let mut buf = [0; 1024];
+                let mut offset = 0;
                 let size = self.stream.read(&mut buf).await.unwrap();
                 if size == 0 {
                     break;
@@ -130,6 +166,7 @@ pub mod frame {
                         let op = String::from_utf8_lossy(&buf).to_string();
                         if let Some(op) = str2op(&op) {
                             self._cache.send(op).await;
+                            offset = i.0;
                         }
                     }
                 }
