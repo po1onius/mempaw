@@ -15,8 +15,8 @@ pub mod op {
     }
 
     enum ParseState {
-        Normal,
-        Array(usize),
+        Len,
+        Data,
     }
 
     enum ParseArrayState {}
@@ -25,49 +25,55 @@ pub mod op {
     const CLI_LEN_MIN: u32 = 4;
 
     struct Parser<'a> {
-        buf: &'a [u8; 1024],
+        buf: &'a Vec<u8>,
         cursor: usize,
         len: usize,
         res: Vec<Op>,
-        state: ParseState,
+        array_cache: Vec<CliValue>,
+        array_state: i32,
     }
 
     impl Parser<'_> {
         fn parse(&mut self) -> usize {
-            match self.buf[self.cursor] {
-                b'*' => {}
-                _ => {}
+            let mut cursor = 0;
+            loop {
+                if cursor >= self.buf.len() {
+                    break;
+                }
+                match self.buf[cursor] {
+                    b'*' => {
+                        if self.array_state > 0 {
+                            panic!("array in array?");
+                        }
+                        self.array_state = 0;
+                        cursor += 1;
+                    }
+                    b'+' => {
+                        let (unit_data, peek) =
+                            parse_pair(self.buf.as_ref(), self.buf.len() - cursor).unwrap();
+                    }
+                    _ => {
+                        panic!("");
+                    }
+                }
             }
 
             3
         }
-
-        fn parse_len(&mut self) -> usize {}
     }
 
-    fn parse(buf: &[u8; 1024], len: usize) -> (Vec<CliValue>, usize) {
-        match buf[0] {
-            b'*' => {
-                let idx = buf[1..].iter().position(|v| *v == b'\r').unwrap();
-                let mut len_arry = str::from_utf8(&buf[1..idx])
-                    .unwrap()
-                    .parse::<u32>()
-                    .unwrap();
-                loop {
-                    if len_arry == 0 {
-                        break;
-                    }
-
-                    len_arry -= 1;
+    fn parse_pair(buf: &[u8], size: usize) -> Result<(&[u8], usize), ()> {
+        for (i, v) in buf.iter().enumerate() {
+            if *v == b'\r' {
+                let len = str::from_utf8(&buf[..i]).unwrap().parse::<usize>().unwrap();
+                let last = i + 1 + len;
+                if last >= size {
+                    return Err(());
                 }
-            }
-            b'+' => {}
-            _ => {
-                panic!("parse cli");
+                return Ok((&buf[(i + 1)..=last], last));
             }
         }
-
-        (Vec::new(), 0)
+        Err(())
     }
 
     #[cfg(test)]
